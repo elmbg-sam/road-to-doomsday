@@ -78,14 +78,21 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 .cinema{margin:14px 0 0;padding:12px 16px;border:2px solid var(--seat);font-size:15px}
 .cinema b{color:var(--seat)}
 .note{font-size:13px;color:var(--gold);margin-top:2px}
-.row.opt .t{font-weight:500}
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:16px;border:2px solid var(--ink)}
+.tiers button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:8px 4px;font-weight:600;font-size:16px;line-height:1.15}
+.tiers button+button{border-left:2px solid var(--ink)}
+.tiers button small{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+.tiers button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.tiers button[aria-pressed="true"] small{color:var(--bg);opacity:.8}
+.tiers button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.tag.ess{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.status{transition:none}}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <div class="status" id="status" role="status" aria-live="polite"></div>
-<script type="application/json" id="state">{"watched":{"ca1":"2026-09-22","cm":"2026-09-22","im1":"2026-09-23","im2":"2026-09-23","loki1":"pre","loki2":"pre","sm1":"pre","sm2":"pre","sm3":"pre"},"updated":1790130000000}</script>
+<script type="application/json" id="state">{"watched":{"cm":"2026-09-22","im1":"2026-09-23","loki1":"pre","loki2":"pre","sm1":"pre","sm2":"pre","sm3":"2026-09-23","im2":"2026-09-23","ca1":"2026-09-23","hulk":"2026-09-24","thor1":"2026-09-24","av1":"2026-09-27","thor2":"2026-09-27","im3":"2026-09-27","ca2":"2026-09-27","gg1":"2026-09-27"},"tier":3,"updated":1790483853951}</script>
 <script id="main">
 (function(){
 // [id, title, year, minutes, kind (u=new to you, r=rewatch, c=cinema), optional, note]
@@ -134,7 +141,12 @@ const LIST=[
 ["ff","The Fantastic Four: First Steps",2025,115,"u"],
 ["sm4","Spider-Man: Brand New Day",2026,150,"u",0,"Sony release, so not on Disney+. Catch a late cinema session or rent it digitally"]
 ];
-const MARKS={bw:["2026-10-18","Checkpoint: Black Widow by Sunday 18 October"],fws:["2026-11-08","Checkpoint: Falcon and the Winter Soldier by Sunday 8 November"],mv:["2026-11-29","Checkpoint: all 2022–23 new-to-you films by Sunday 29 November"],sm4:["2026-12-16","Finish by Wednesday 16 December"]};
+// 1 = Essential, 2 = Ideal, 3 = Full. Each list includes the ones before it.
+const TIER={av3:1,av4:1,fws:1,loki1:1,sc:1,bp2:1,loki2:1,dw:1,ca4:1,tb:1,ff:1,
+  ca1:2,cm:2,im1:2,im2:2,av1:2,ca2:2,gg1:2,gg3:2,ca3:2,bw:2,bp1:2,thor3:2,sm3:2,ds2:2,am3:2,mv:2,xm1:2,xm2:2,sm4:2};
+const TIERS=[,"Essential","Ideal","Full"];
+function tierOf(x){return TIER[x[0]]||3}
+const MARKS={bw:["2026-10-18","Checkpoint: Black Widow by Sunday 18 October","Sunday 18 October"],fws:["2026-11-08","Checkpoint: Falcon and the Winter Soldier by Sunday 8 November","Sunday 8 November"],mv:["2026-11-29","Checkpoint: all 2022–23 new-to-you films by Sunday 29 November","Sunday 29 November"],sm4:["2026-12-16","Finish by Wednesday 16 December","Wednesday 16 December"]};
 const START=new Date(2026,8,20), FINISH=new Date(2026,11,16), RELEASE=new Date(2026,11,17);
 const NEW=LIST.filter(x=>x[4]==="u");
 const LS="mcu-doomsday-tracker-v2";
@@ -148,13 +160,14 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;","
 function dayname(d){return d.toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"})}
 
 function render(){
-  const t=today(), w=state.watched;
-  const CORE=LIST.filter(x=>!x[5]&&w[x[0]]!=="pre");
+  const t=today(), w=state.watched, lv=state.tier||3;
+  const V=LIST.filter(x=>tierOf(x)<=lv);
+  const CORE=V.filter(x=>w[x[0]]!=="pre");
   const TOTAL=CORE.reduce((a,x)=>a+x[3],0);
   const doneMin=CORE.reduce((a,x)=>a+(w[x[0]]?x[3]:0),0);
-  const doneN=LIST.filter(x=>w[x[0]]).length;
-  const newDone=NEW.filter(x=>w[x[0]]).length;
-  const next=LIST.find(x=>!w[x[0]]&&!x[5]&&x[4]!=="c");
+  const doneN=V.filter(x=>w[x[0]]).length;
+  const VNEW=V.filter(x=>x[4]==="u"), newDone=VNEW.filter(x=>w[x[0]]).length;
+  const next=V.find(x=>!w[x[0]]&&x[4]!=="c");
   const daysToRelease=Math.max(0,Math.round((RELEASE-t)/864e5));
   const span=(FINISH-START)/864e5, elapsed=Math.min(span,Math.max(0,(t-START)/864e5+1));
   const shouldMin=TOTAL*elapsed/span;
@@ -165,27 +178,34 @@ function render(){
     :`<div class="lbl">Up next${next[4]==="u"?", new to you":""}</div><div class="ttl">${esc(next[1])}</div>`;
   const cinema=w.av4?"":`<div class="cinema"><b>In cinemas now: Avengers Endgame: Encore.</b> Rewatch, so see it whenever suits, but re-release runs are short. Book the IMAX session at Dendy Canberra to get the new Doomsday scene.</div>`;
   let h=`<header class="hero"><div class="days">${daysToRelease}<small>${daysToRelease===1?"day":"days"} until Avengers: Doomsday, ${dayname(RELEASE)}</small></div>
-  <p class="sub">Story order. Tap a title when you've watched it. If you fall behind, cut rewatches, never the new-to-you ones.</p>
+  <p class="sub">Story order. Tap a title when you've watched it. If you fall behind, switch to a shorter list rather than skip a new-to-you title.</p>
+  <div class="tiers" role="group" aria-label="Watch list">${[1,2,3].map(n=>{const L=LIST.filter(x=>tierOf(x)<=n);return `<button type="button" data-tier="${n}" aria-pressed="${n===lv}">${TIERS[n]}<small>${L.length} titles, ${Math.round(L.reduce((a,x)=>a+x[3],0)/60)} h</small></button>`}).join("")}</div>
   <div class="now">${now}</div>${cinema}
-  <div class="pace"><span><b>${newDone} / ${NEW.length}</b>new to you</span><span><b>${doneN} / ${LIST.length}</b>watched</span><span>${pace}</span><span><b>${hrs(leftMin/weeksLeft)} h</b>a week needed</span></div>
+  <div class="pace"><span><b>${newDone} / ${VNEW.length}</b>new to you</span><span><b>${doneN} / ${V.length}</b>watched</span><span>${pace}</span><span><b>${hrs(leftMin/weeksLeft)} h</b>a week needed</span></div>
   <div class="bar" aria-hidden="true"><i style="width:${(doneMin/TOTAL*100).toFixed(1)}%"></i><u style="left:${Math.min(100,shouldMin/TOTAL*100).toFixed(1)}%"></u></div>
-  <div class="legend">Bar shows hours watched, excluding optional titles. The black line is where you should be today.</div></header><ol>`;
+  <div class="legend">Bar shows hours watched in this list. The black line is where you should be today.</div></header><ol>`;
+  let n=0, last=null;
   LIST.forEach((x,i)=>{
-    const [id,title,yr,min,kind,opt,note]=x, d=w[id];
+    const [id,title,yr,min,kind,opt,note]=x, d=w[id], tier=tierOf(x), show=tier<=lv;
+    if(show){n++;last=title}
+    if(!show&&!MARKS[id])return;
+    if(show){
     let tags="";
     if(kind==="u")tags+=`<span class="tag new">New to you</span>`;
     if(kind==="c")tags+=`<span class="tag key">In cinemas</span>`;
-    if(opt)tags+=`<span class="tag cut">Optional</span>`;
+    if(tier===1&&lv>1)tags+=`<span class="tag ess">Essential</span>`;
     const len=min>=240?"series, about "+hrs(min)+" h":Math.floor(min/60)+" h "+String(min%60).padStart(2,"0")+" m";
     const meta=`${yr}, ${len}${d==="pre"?", watched before this plan":d?", watched "+new Date(d+"T00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short"}):""}`;
-    h+=`<li class="row${d?" done":""}${next&&id===next[0]?" next":""}${opt?" opt":""}"><button class="item" data-id="${id}" aria-pressed="${!!d}">
-      <span class="num">${i+1}</span><span><span class="t">${esc(title)}</span>${tags}<div class="meta">${meta}</div>${note&&!d?`<div class="note">${esc(note)}</div>`:""}</span><span class="box">${d?"&#10003;":""}</span></button></li>`;
-    if(MARKS[id]){
-      const idx=i, late=t>new Date(MARKS[id][0]+"T00:00")&&LIST.slice(0,idx+1).some(y=>y[4]==="u"&&!w[y[0]]);
-      h+=`<li class="mark${late?" late":""}">${MARKS[id][1]}${late?", passed with new-to-you titles still unwatched":""}</li>`;
+    h+=`<li class="row${d?" done":""}${next&&id===next[0]?" next":""}"><button class="item" data-id="${id}" aria-pressed="${!!d}">
+      <span class="num">${n}</span><span><span class="t">${esc(title)}</span>${tags}<div class="meta">${meta}</div>${note&&!d?`<div class="note">${esc(note)}</div>`:""}</span><span class="box">${d?"&#10003;":""}</span></button></li>`;
+    }
+    if(MARKS[id]&&last){
+      const idx=i, late=t>new Date(MARKS[id][0]+"T00:00")&&LIST.slice(0,idx+1).some(y=>tierOf(y)<=lv&&y[4]==="u"&&!w[y[0]]);
+      const txt=show||id==="sm4"?MARKS[id][1]:`Checkpoint: up to ${esc(last)} by ${MARKS[id][2]}`;
+      h+=`<li class="mark${late?" late":""}">${txt}${late?", passed with new-to-you titles still unwatched":""}</li>`;
     }
   });
-  h+=`</ol><p class="foot">About ${hrs(TOTAL)} hours of core viewing still counted toward pace, plus ${hrs(LIST.filter(x=>x[5]).reduce((a,x)=>a+x[3],0))} h optional. Titles watched before this plan are ticked and left out of the pace maths. Checkpoints only turn red if a new-to-you title is still unwatched. Ticks are saved on this phone only, so back them up now and then.</p><div class="tools"><button type="button" id="backup">Copy backup</button><button type="button" id="restore">Restore from backup</button></div><p class="foot"></p>`;
+  h+=`</ol><p class="foot">About ${hrs(TOTAL)} hours in the ${TIERS[lv]} list count toward pace. Switching lists keeps your ticks. Titles watched before this plan are ticked and left out of the pace maths. Checkpoints only turn red if a new-to-you title is still unwatched. Ticks are saved on this phone only, so back them up now and then.</p><div class="tools"><button type="button" id="backup">Copy backup</button><button type="button" id="restore">Restore from backup</button></div><p class="foot"></p>`;
   document.getElementById("app").innerHTML=h;
 }
 
@@ -200,6 +220,8 @@ function schedule(msg,undo){
   flash(msg||"Saved",undo);
 }
 document.getElementById("app").addEventListener("click",e=>{
+  const tb=e.target.closest("button[data-tier]");
+  if(tb){state.tier=+tb.dataset.tier;render();saveLocal();flash(TIERS[state.tier]+" list");return}
   const b=e.target.closest("button.item");if(!b)return;
   const id=b.dataset.id, x=LIST.find(y=>y[0]===id);
   if(state.watched[id]){
